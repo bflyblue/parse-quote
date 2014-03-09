@@ -3,7 +3,7 @@ module Pcap where
 import Control.Applicative
 
 import Data.ByteString as BS (ByteString)
-import Data.ByteString.Lazy as LBS (ByteString, fromStrict)
+import Data.ByteString.Lazy as LBS (ByteString, fromStrict, empty)
 
 import Data.Binary
 import Data.Binary.Get
@@ -19,7 +19,13 @@ import qualified UDP
 class Pretty a where
     pretty :: a -> String
 
-data Pcap = Pcap !PktHdr !Datalink !Network !Transport LBS.ByteString
+data Pcap = Pcap
+    { _pcapHdr      :: !PktHdr
+    , _datalink     :: !Datalink
+    , _network      :: !Network
+    , _transport    :: !Transport
+    , _payload      :: LBS.ByteString
+    }
     deriving (Show)
 
 instance Pretty Pcap where
@@ -84,6 +90,7 @@ network (Ethernet frame) =
     case Ethernet._ethertype frame of
         Ethernet.IP4 -> ip4
         ftype -> UnsupportedNetwork <$> (pure . fromIntegral . Ethernet.fromEtherType) ftype <*> getRemainingLazyByteString
+network UnsupportedDatalink{} = return $! UnsupportedNetwork 0 LBS.empty
 
 ip4 :: Get Network
 ip4 = IP4 <$> get
@@ -93,6 +100,7 @@ transport (IP4 p) =
     case IP4._protocol p of
         IP4.UDP -> udp
         prot -> UnsupportedTransport <$> (pure . fromIntegral . IP4.fromProtocol) prot <*> getRemainingLazyByteString
+transport UnsupportedNetwork{} = return $! UnsupportedTransport 0 LBS.empty
 
 udp :: Get Transport
 udp = UDP <$> get
