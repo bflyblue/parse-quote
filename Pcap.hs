@@ -41,13 +41,11 @@ instance Pretty Network where
     pretty (IP4 p) = show p
     pretty (UnsupportedNetwork net raw) = "UnsupportedNetwork " ++ show net ++ "\n" ++ pretty raw
 
-data Transport = TCP
-               | UDP UDP.Packet
+data Transport = UDP UDP.Packet
                | UnsupportedTransport !Word8 LBS.ByteString
     deriving (Show)
 
 instance Pretty Transport where
-    pretty TCP = "TCP"
     pretty (UDP p) = show p
     pretty (UnsupportedTransport t raw) = "UnsupportedTransport " ++ show t ++ "\n" ++ pretty raw
 
