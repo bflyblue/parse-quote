@@ -20,14 +20,14 @@ executable parse-quote
   -- other-modules:       
   other-extensions:    DeriveGeneric, OverloadedStrings
   build-depends:       base >=4.6 && <4.8,
-                       time,
-                       mtl,
-                       pcap,
-                       bytedump,
-                       bytestring,
-                       binary,
-                       conduit,
-                       pqueue,
-                       optparse-applicative
+                       time ==1.4.*,
+                       mtl ==2.1.*,
+                       pcap ==0.4.5.*,
+                       bytedump ==1.*,
+                       bytestring ==0.10.*,
+                       binary ==0.7.*,
+                       conduit ==1.0.*,
+                       pqueue ==1.2.*,
+                       optparse-applicative ==0.7.*
   -- hs-source-dirs:      
   default-language:    Haskell2010
