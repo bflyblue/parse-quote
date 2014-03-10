@@ -52,11 +52,11 @@ quoteReorder window = do
     ma <- await
     case ma of
         Just (t, q) -> do
-            flush ((>300) . diffTime t)
+            flush $ (>300) . diffTime t
             lift $ modify $ PQ.insert (parseTime $ _acceptTime q) (t, q)
             quoteReorder window
         Nothing -> do
-            flush (const True)
+            flush $ const True
             return ()
     where
         flush p = do
@@ -72,8 +72,8 @@ quotePrinter :: MonadIO m => Sink (Time, Quote) m ()
 quotePrinter = CL.mapM_ $ \(t, q) -> do
     let str = BS.intercalate " " $
                 [ mkTime t, _acceptTime q, _issueCode q ]
-                ++ map pq (reverse . take 5 $ [(p, n) | Bid p n <- _bids q])
-                ++ map pq (          take 5 $ [(p, n) | Ask p n <- _asks q])
+                ++ map pq [(p, n) | Bid p n <- reverse . take 5 $ _bids q]
+                ++ map pq [(p, n) | Ask p n <-           take 5 $ _asks q]
     liftIO $ BS.putStrLn str
     where
         pq (p', q') = p' <> "@" <> q'

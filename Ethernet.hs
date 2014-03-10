@@ -35,7 +35,7 @@ instance Binary EtherFrame where
                 etype <- get
                 return $! EtherQFrame src dest tpid tci etype
             _ ->
-                return $ EtherFrame src dest tpid
+                return $! EtherFrame src dest tpid
 
 data MacAddress = MacAddress !Word8 !Word8 !Word8 !Word8 !Word8 !Word8
     deriving (Show, Generic)

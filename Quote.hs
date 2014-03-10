@@ -25,8 +25,8 @@ instance Binary Quote where
         dataType            <- getByteString 2
         infoType            <- getByteString 2
         marketType          <- getByteString 1
-        if  dataType == "B6" &&
-            infoType == "03" &&
+        if  dataType  == "B6" &&
+            infoType  == "03" &&
             marketType == "4"
         then do
             issueCode           <- getByteString 12
