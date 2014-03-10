@@ -1,10 +1,15 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
 import Control.Monad.Trans
 
 import Data.Binary
+import qualified Data.ByteString.Char8 as BS
 import Data.Conduit
-import Data.Conduit.List as CL
+import qualified Data.Conduit.List as CL
+import Data.Monoid
+
 import Network.Pcap
 import Pcap
 import Quote
@@ -27,11 +32,18 @@ pcapDecode = CL.concatMap decodePcap
                 Right (_, _, q@Quote{}) -> [q]
                 _ -> []
 
-printer :: Show s => Sink s IO ()
-printer = CL.mapM_ $ putStrLn . show
+quotePrinter :: Sink Quote IO ()
+quotePrinter = CL.mapM_ $ \q -> do
+    let str = BS.intercalate " " $
+                [ _acceptTime q, _issueCode q ]
+                ++ map pq (reverse . take 5 $ [(bp, bq) | Bid bp bq <- _bids q])
+                ++ map pq (take 5 $ [(ap, aq) | Ask ap aq <- _asks q])
+    BS.putStrLn str
+    where
+        pq (p', q') = p' <> "@" <> q'
 
 main :: IO ()
 main = do
     h <- openOffline "mdf-kospi200.20110216-0.pcap"
     dl <- Network.Pcap.datalink h
-    pcapSrc h dl $$ pcapDecode =$ printer
+    pcapSrc h dl $$ pcapDecode =$ quotePrinter
