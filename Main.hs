@@ -3,19 +3,23 @@
 module Main where
 
 import Control.Monad.Trans
+import Control.Monad.State as State
+import Data.Monoid
 
 import Data.Char
-import Data.Binary
+import Data.Binary (decodeOrFail)
 import qualified Data.ByteString.Char8 as BS
+
+import qualified Data.PQueue.Prio.Min as PQ
+
 import Data.Conduit
 import qualified Data.Conduit.List as CL
-import Data.Monoid
 
 import Network.Pcap
 import Pcap
 import Quote
 
-pcapSrc :: PcapHandle -> Link -> Source IO Pcap
+pcapSrc :: MonadIO m => PcapHandle -> Link -> Source m Pcap
 pcapSrc h l = do
     mp <- liftIO $ nextPcap h l
     case mp of
@@ -25,8 +29,10 @@ pcapSrc h l = do
         Nothing ->
             return ()
 
-parseTime :: BS.ByteString -> (Int, Int, Int, Int)
-parseTime bt = (fi h, fi m, fi s, fi hs)
+data Time = Time Int Int Int Int deriving (Show, Eq, Ord)
+
+parseTime :: BS.ByteString -> Time
+parseTime bt = Time (fi h) (fi m) (fi s) (fi hs)
     where
         fi = fromIntegral
         t = maybe 0 fst $ BS.readInteger bt
@@ -35,15 +41,18 @@ parseTime bt = (fi h, fi m, fi s, fi hs)
         s  = t `div`     100 `mod` 100
         hs =               t `mod` 100
 
-mkTime :: (Int, Int, Int, Int) -> BS.ByteString
-mkTime (h, m, s, hs) = (mkDigits 2 h) <> (mkDigits 2 m) <> (mkDigits 2 s) <> (mkDigits 2 hs)
+mkTime :: Time -> BS.ByteString
+mkTime (Time h m s hs) = (mkDigits 2 h) <> (mkDigits 2 m) <> (mkDigits 2 s) <> (mkDigits 2 hs)
     where
         mkDigits 0 _ = BS.empty
         mkDigits i n = let (d, r) = divMod n 10 in mkDigits (i - 1 :: Int) d <> mkDigit r
 
         mkDigit = BS.singleton . intToDigit
 
-pcapDecode :: Monad m => Conduit Pcap m (BS.ByteString, Quote)
+diffTime :: Time -> Time -> Int
+diffTime (Time ah am as ahs) (Time bh bm bs bhs) = (ah - bh) * 360000 + (am - bm) * 6000 + (as - bs) * 100 + (ahs - bhs)
+
+pcapDecode :: Monad m => Conduit Pcap m (Time, Quote)
 pcapDecode = CL.concatMap decodePcap
     where
         decodePcap p =
@@ -56,17 +65,41 @@ pcapDecode = CL.concatMap decodePcap
                 usec = fromIntegral $ mod t 60000000
                 sec = usec `div` 1000000
                 hsec = usec `div` 10000 `mod` 100
-                (h, m, s, _) = parseTime (_acceptTime q)
+                Time h m s _ = parseTime (_acceptTime q)
                 (h', m') = (h + (m + 1) `div` 60 , (m + 1) `mod` 60)
-            in mkTime . snd $ min (abs (sec - s), (h, m, sec, hsec)) (abs (60 + sec - s), (h', m', sec, hsec))
+            in snd $ min (abs (sec - s), Time h m sec hsec) (abs (60 + sec - s), Time h' m' sec hsec)
 
-quotePrinter :: Sink (BS.ByteString, Quote) IO ()
+type PQueue = PQ.MinPQueue Time (Time, Quote)
+
+quoteReorder :: Monad m => Int -> Conduit (Time, Quote) (StateT PQueue m) (Time, Quote)
+quoteReorder window = do
+    ma <- await
+    case ma of
+        Just (t, q) -> do
+            flush ((>300) . diffTime t)
+            lift $ modify $ PQ.insert (parseTime $ _acceptTime q) (t, q)
+            quoteReorder window
+        Nothing -> do
+            flush (const True)
+            return ()
+    where
+        flush p = do
+            pq <- lift get
+            unless (PQ.null pq) $ do
+                let (t, q) = PQ.findMin pq
+                when (p t) $ do
+                    lift $ modify PQ.deleteMin
+                    yield q
+                    flush p
+
+
+quotePrinter :: MonadIO m => Sink (Time, Quote) m ()
 quotePrinter = CL.mapM_ $ \(t, q) -> do
     let str = BS.intercalate " " $
-                [ t, _acceptTime q, _issueCode q ]
-                ++ map pq (reverse . take 5 $ [(bp, bq) | Bid bp bq <- _bids q])
-                ++ map pq (take 5 $ [(ap, aq) | Ask ap aq <- _asks q])
-    BS.putStrLn str
+                [ mkTime t, _acceptTime q, _issueCode q ]
+                ++ map pq (reverse . take 5 $ [(p, n) | Bid p n <- _bids q])
+                ++ map pq (          take 5 $ [(p, n) | Ask p n <- _asks q])
+    liftIO $ BS.putStrLn str
     where
         pq (p', q') = p' <> "@" <> q'
 
@@ -74,4 +107,4 @@ main :: IO ()
 main = do
     h <- openOffline "mdf-kospi200.20110216-0.pcap"
     dl <- Network.Pcap.datalink h
-    pcapSrc h dl $$ pcapDecode =$ quotePrinter
+    evalStateT (pcapSrc h dl $$ pcapDecode =$= quoteReorder 3 =$ quotePrinter) PQ.empty
