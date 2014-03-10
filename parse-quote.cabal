@@ -12,7 +12,7 @@ maintainer:          shaun.sharples@gmail.com
 -- copyright:           
 -- category:            
 build-type:          Simple
-extra-source-files:  Ethernet.hs, IP4.hs, Pcap.hs, UDP.hs
+extra-source-files:  Ethernet.hs, IP4.hs, Pcap.hs, Quote.hs, UDP.hs
 cabal-version:       >=1.10
 
 executable sfd
@@ -20,9 +20,12 @@ executable sfd
   -- other-modules:       
   other-extensions:    DeriveGeneric, OverloadedStrings
   build-depends:       base >=4.6 && <4.8,
+                       mtl,
                        pcap,
                        bytedump,
                        bytestring,
-                       binary
+                       binary,
+                       conduit,
+                       pqueue
   -- hs-source-dirs:      
   default-language:    Haskell2010
