@@ -20,6 +20,7 @@ executable parse-quote
   -- other-modules:       
   other-extensions:    DeriveGeneric, OverloadedStrings
   build-depends:       base >=4.6 && <4.8,
+                       time,
                        mtl,
                        pcap,
                        bytedump,
