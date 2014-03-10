@@ -14,20 +14,27 @@ import qualified Data.PQueue.Prio.Min as PQ
 import Data.Conduit
 import qualified Data.Conduit.List as CL
 
+import Options.Applicative
+
 import Network.Pcap
 import Pcap
 import Quote
 import Time
 
-pcapSrc :: MonadIO m => PcapHandle -> Link -> Source m Pcap
-pcapSrc h l = do
-    mp <- liftIO $ nextPcap h l
-    case mp of
-        Just p -> do
-            yield p
-            pcapSrc h l
-        Nothing ->
-            return ()
+pcapOffline :: MonadIO m => Conduit String m Pcap
+pcapOffline = awaitForever $ \filepath -> do
+    ph <- liftIO $ openOffline filepath
+    dl <- liftIO $ Network.Pcap.datalink ph
+    yieldPcap ph dl
+    where
+        yieldPcap h l = do
+            mp <- liftIO $ nextPcap h l
+            case mp of
+                Just p -> do
+                    yield p
+                    yieldPcap h l
+                Nothing ->
+                    return ()
 
 pcapDecode :: Monad m => Conduit Pcap m (Time, Quote)
 pcapDecode = CL.concatMap decodePcap
@@ -52,7 +59,7 @@ quoteReorder window = do
     ma <- await
     case ma of
         Just (t, q) -> do
-            flush $ (>300) . diffTime t
+            flush $ (>window) . diffTime t
             lift $ modify $ PQ.insert (parseTime $ _acceptTime q) (t, q)
             quoteReorder window
         Nothing -> do
@@ -70,16 +77,33 @@ quoteReorder window = do
 
 quotePrinter :: MonadIO m => Sink (Time, Quote) m ()
 quotePrinter = CL.mapM_ $ \(t, q) -> do
-    let str = BS.intercalate " " $
+    let line = BS.intercalate " " $
                 [ mkTime t, _acceptTime q, _issueCode q ]
                 ++ map pq [(p, n) | Bid p n <- reverse . take 5 $ _bids q]
                 ++ map pq [(p, n) | Ask p n <-           take 5 $ _asks q]
-    liftIO $ BS.putStrLn str
+    liftIO $ BS.putStrLn line
     where
         pq (p', q') = p' <> "@" <> q'
 
+data Options = Options
+    { _files    :: [String]
+    , _reorder  :: Bool
+    }
+    deriving Show
+
+options :: Parser Options
+options = Options
+    <$> arguments str   (metavar "FILES...")
+    <*> switch          (short 'r' <> long "reorder" <> help "Reorder according to quote accept time")
+
+parse :: Options -> IO ()
+parse o = do
+    let dec = if _reorder o then pcapDecode =$= quoteReorder 300 else pcapDecode
+    evalStateT (CL.sourceList (_files o) $$ pcapOffline =$= dec =$ quotePrinter) PQ.empty
+
 main :: IO ()
 main = do
-    h <- openOffline "mdf-kospi200.20110216-0.pcap"
-    dl <- Network.Pcap.datalink h
-    evalStateT (pcapSrc h dl $$ pcapDecode =$= quoteReorder 3 =$ quotePrinter) PQ.empty
+    execParser opts >>= parse
+    where
+        opts = info (helper <*> options)
+             (fullDesc <> progDesc "Parse and print quote messages from market data in FILES")
