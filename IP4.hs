@@ -41,14 +41,14 @@ instance Binary Packet where
         headercsum      <- getWord16be
         srcaddr         <- get
         dstaddr         <- get
-        let ver   = select ver_ihl      4 0xf
-            ihl   = select ver_ihl      0 0xf
-            dscp  = select dscp_ecn     2 0x6f
-            ecn   = select dscp_ecn     0 0x3
-            flags = select flags_frag  14 0x7
-            frag  = select flags_frag   0 0x1fff
+        let ver     = select ver_ihl      4 0xf
+            ihl     = select ver_ihl      0 0xf
+            dscp    = select dscp_ecn     2 0x6f
+            ecn     = select dscp_ecn     0 0x3
+            flags   = select flags_frag  14 0x7
+            frag    = select flags_frag   0 0x1fff
         when (ihl < 5) $ fail "Internet Header Length < 5"
-        options         <- replicateM (fromIntegral ihl - 5) getWord32be
+        options <- replicateM (fromIntegral ihl - 5) getWord32be
         return $! Packet ver ihl dscp ecn totalLength identification (fromIntegral flags) frag ttl protocol headercsum srcaddr dstaddr options
         where
             select v s a = (v `shiftR` s) .&. a
