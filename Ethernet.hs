@@ -10,12 +10,12 @@ import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
 
-data EtherFrame = EtherFrame
+data EtherFrame = EtherFrame    -- ^ Ethernet II
                 { _source       :: !MacAddress
                 , _destination  :: !MacAddress
                 , _ethertype    :: !EtherType
                 }
-                | EtherQFrame
+                | EtherQFrame   -- ^ 802.1Q
                 { _source       :: !MacAddress
                 , _destination  :: !MacAddress
                 , _tpid         :: !EtherType

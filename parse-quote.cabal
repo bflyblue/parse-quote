@@ -12,7 +12,15 @@ maintainer:          shaun.sharples@gmail.com
 -- copyright:           
 -- category:            
 build-type:          Simple
-extra-source-files:  Ethernet.hs, IP4.hs, Pcap.hs, Quote.hs, Time.hs, UDP.hs
+extra-source-files:  Ethernet.hs,
+                     IP4.hs,
+                     Pcap.hs,
+                     Quote.hs,
+                     Time.hs,
+                     UDP.hs,
+                     Datalink.hs,
+                     Network.hs
+                     Transport.hs
 cabal-version:       >=1.10
 
 executable parse-quote
