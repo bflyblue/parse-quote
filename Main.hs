@@ -79,14 +79,13 @@ pcapDecode = CL.concatMap decodePcap
 
 -- |Ugly function that tries to guess capture time.
 -- pcap time is in Unixtime (UCT) but Accept time is in Localtime.
--- We assume they're no more than 3 seconds apart;
--- here we try round 30 seconds up or down to try match Accept time.
+-- We assume they're less than 30 seconds apart
 adjustPcapTime :: Pcap -> Quote -> Time
 adjustPcapTime packet quote =
     let accept = parseTime . _acceptTime $ quote
         capture = fromUnixTime . hdrTime . _pcapHdr $ packet
-        Time ah am as ahs = accept
-        Time ch cm cs chs = capture
+        Time ah am  _   _ = accept
+        Time  _  _ cs chs = capture
         adjustLow = Time ah am cs chs
         adjustHi  = addTime adjustLow 6000
         delta t = (abs $ diffTime t accept, t)
@@ -99,6 +98,11 @@ dumpPretty = CL.mapM $ \a -> do
 
 type PQueue = PQ.MinPQueue Time (Time, Quote)
 
+-- |Conduit that takes quotes and their capture times, and tries to reorder them
+-- by the quote Accept time. New quotes are inserted into a priority queues using
+-- the Accept time as the key. The minumim value in the priority queue is removed
+-- when it is 'w' hundredths of a second older than the current capture time, or
+-- when no more quotes are available upstream.
 quoteReorder :: Monad m => Int -> Conduit (Time, Quote) (StateT PQueue m) (Time, Quote)
 quoteReorder w = do
     ma <- await
@@ -120,6 +124,7 @@ quoteReorder w = do
                     yield q
                     flush p
 
+-- |Print quotes.
 quotePrinter :: MonadIO m => Sink (Time, Quote) m ()
 quotePrinter = CL.mapM_ $ \(t, q) -> do
     let line = BS.intercalate " " $
@@ -129,4 +134,3 @@ quotePrinter = CL.mapM_ $ \(t, q) -> do
     liftIO $ BS.putStrLn line
     where
         pq (p', q') = p' <> "@" <> q'
-
