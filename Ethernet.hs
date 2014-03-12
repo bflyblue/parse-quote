@@ -10,18 +10,18 @@ import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
 
-data EtherFrame = EtherFrame    -- ^ Ethernet II
+data EtherFrame = EtherFrame
                 { _source       :: !MacAddress
                 , _destination  :: !MacAddress
                 , _ethertype    :: !EtherType
-                }
-                | EtherQFrame   -- ^ 802.1Q
+                }               -- ^ Ethernet II
+                | EtherQFrame
                 { _source       :: !MacAddress
                 , _destination  :: !MacAddress
                 , _tpid         :: !EtherType
                 , _tci          :: !Word16
                 , _ethertype    :: !EtherType
-                }
+                }               -- ^ 802.1Q
     deriving (Show, Generic)
 
 instance Binary EtherFrame where
