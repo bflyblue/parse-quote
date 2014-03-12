@@ -50,11 +50,3 @@ addTime (Time h m s hs) hundredths =
         (h', m'') = divMod (m + m') 60
         h''       = mod    (h + h') 60
     in  Time h'' m'' s'' hs'
-
-        -- pcapTime p q =
-        --     let t = hdrTime . _pcapHdr $ p
-        --         sec = fromIntegral $ t `div` 1000000 `mod` 60
-        --         hsec = fromIntegral $ t `div` 10000 `mod` 100
-        --         Time h m s _ = parseTime (_acceptTime q)
-        --         (h', m') = (h + (m + 1) `div` 60 , (m + 1) `mod` 60)
-        --     in snd $ min (abs (sec - s), Time h m sec hsec) (abs (60 + sec - s), Time h' m' sec hsec)
