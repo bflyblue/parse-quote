@@ -1,7 +1,7 @@
 module Time where
 
 import Data.ByteString.Char8
-import Data.Char
+import Data.ByteString.Builder
 import Data.Monoid
 
 data Time = Time Int Int Int Int deriving (Show, Eq, Ord)
@@ -28,11 +28,11 @@ fromUnixTime t = Time (fi h) (fi m) (fi s) (fi hs)
         hs = t `div`      10000 `mod` 100
 
 -- | Format a 'Time' as HHMMSShh.
-mkTime :: Time -> ByteString
+mkTime :: Time -> Builder
 mkTime (Time h m s hs) = mkDigits h <> mkDigits m <> mkDigits s <> mkDigits hs
     where
         mkDigits n = let (t, u) = divMod n 10 in mkDigit t <> mkDigit u
-        mkDigit = singleton . intToDigit
+        mkDigit = intDec
 
 -- | Calculate the different betweeen two 'Time' values in hundredths of a second.
 diffTime :: Time -> Time -> Int

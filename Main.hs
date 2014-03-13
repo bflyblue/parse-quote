@@ -7,7 +7,8 @@ import Control.Monad.State as State
 import Data.Monoid
 
 import Data.Binary (decodeOrFail)
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.ByteString.Builder
 
 import qualified Data.PQueue.Prio.Min as PQ
 
@@ -127,10 +128,12 @@ quoteReorder w = do
 -- |Print quotes.
 quotePrinter :: MonadIO m => Sink (Time, Quote) m ()
 quotePrinter = CL.mapM_ $ \(t, q) -> do
-    let line = BS.intercalate " " $
-                [ mkTime t, _acceptTime q, _issueCode q ]
-                ++ map pq [(p, n) | Bid p n <- reverse . take 5 $ _bids q]
-                ++ map pq [(p, n) | Ask p n <-           take 5 $ _asks q]
-    liftIO $ BS.putStrLn line
-    where
-        pq (p', q') = p' <> "@" <> q'
+    let sp = char8 ' '
+        pq (p', q') = sp <> byteString p' <> char8 '@' <> byteString q'
+        line =
+            mkTime t  <>
+            sp <> byteString (_acceptTime q) <>
+            sp <> byteString (_issueCode q) <>
+            mconcat [pq (p, n) | Bid p n <- reverse . take 5 $ _bids q] <>
+            mconcat [pq (p, n) | Ask p n <-           take 5 $ _asks q]
+    liftIO . LBS.putStrLn . toLazyByteString $ line
